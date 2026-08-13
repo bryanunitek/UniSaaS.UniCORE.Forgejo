@@ -26,10 +26,12 @@ func TestLFSRender(t *testing.T) {
 
 	session := loginUser(t, "user2")
 
-	// check that a markup file is flagged with "Stored in Git LFS" and shows its text
+	// check that a markup file is flagged with the appropriate Git LFS label
+	// and that its text is shown in the file view and the diff view
 	t.Run("Markup", func(t *testing.T) {
 		defer tests.PrintCurrentTest(t)()
 
+		// View file
 		req := NewRequest(t, "GET", "/user2/lfs/src/branch/master/CONTRIBUTING.md")
 		resp := session.MakeRequest(t, req, http.StatusOK)
 
@@ -40,9 +42,26 @@ func TestLFSRender(t *testing.T) {
 
 		content := doc.Find("div.file-view").Text()
 		assert.Contains(t, content, "Testing documents in LFS")
+
+		// View file in diff by obtaining latest commit
+		req = NewRequest(t, "GET", "/user2/lfs/commits/branch/master/CONTRIBUTING.md")
+		resp = session.MakeRequest(t, req, http.StatusOK)
+
+		// Parse the 'History' page, navigate to latest commit and view its diff.
+		doc = NewHTMLParser(t, resp.Body).doc
+		latestCommit, _ := doc.Find(".default-link").First().Attr("href")
+		req = NewRequest(t, "GET", latestCommit)
+		resp = session.MakeRequest(t, req, http.StatusOK)
+
+		doc = NewHTMLParser(t, resp.Body).doc
+
+		// Find the 'Git LFS' label.
+		fileNameDiffBar := doc.Find(".diff-file-name").Last().Text()
+		assert.Contains(t, fileNameDiffBar, "Git LFS")
 	})
 
-	// check that an image is flagged with "Stored in Git LFS" and renders inline
+	// check that an image is flagged with the appropriate Git LFS label
+	// and that its text is shown in the file view and the diff view
 	t.Run("Image", func(t *testing.T) {
 		defer tests.PrintCurrentTest(t)()
 
@@ -57,9 +76,27 @@ func TestLFSRender(t *testing.T) {
 		src, exists := doc.Find(".file-view img").Attr("src")
 		assert.True(t, exists, "The image should be in an <img> tag")
 		assert.Equal(t, "/user2/lfs/media/branch/master/jpeg.jpg", src, "The image should use the /media link because it's in LFS")
+
+		// View file in diff by obtaining latest commit
+		req = NewRequest(t, "GET", "/user2/lfs/commits/branch/master/jpeg.jpg")
+		resp = session.MakeRequest(t, req, http.StatusOK)
+
+		// Parse the 'History' page, navigate to latest commit and view its diff.
+		doc = NewHTMLParser(t, resp.Body).doc
+		latestCommit, _ := doc.Find(".default-link").First().Attr("href")
+		req = NewRequest(t, "GET", latestCommit)
+		resp = session.MakeRequest(t, req, http.StatusOK)
+
+		doc = NewHTMLParser(t, resp.Body).doc
+
+		// Find the 'Git LFS' label.
+		fileNameDiffBar := doc.Find(".diff-file-name").Last().Text()
+		assert.Contains(t, fileNameDiffBar, "Git LFS")
 	})
 
-	// check that a binary file is flagged with "Stored in Git LFS" and renders a /media/ link instead of a /raw/ link
+	// check that a binary file is flagged with "Stored in Git LFS" and renders a
+	// /media/ link instead of a /raw/ link, while the appropriate Git LFS label
+	// is shown in the diff view
 	t.Run("Binary", func(t *testing.T) {
 		defer tests.PrintCurrentTest(t)()
 
@@ -74,9 +111,26 @@ func TestLFSRender(t *testing.T) {
 		rawLink, exists := doc.Find("div.file-view > div.view-raw > a").Attr("href")
 		assert.True(t, exists, "Download link should render instead of content because this is a binary file")
 		assert.Equal(t, "/user2/lfs/media/branch/master/crypt.bin", rawLink, "The download link should use the proper /media link because it's in LFS")
+
+		// View file in diff by obtaining latest commit
+		req = NewRequest(t, "GET", "/user2/lfs/commits/branch/master/crypt.bin")
+		resp = session.MakeRequest(t, req, http.StatusOK)
+
+		// Parse the 'History' page, navigate to latest commit and view its diff.
+		doc = NewHTMLParser(t, resp.Body).doc
+		latestCommit, _ := doc.Find(".default-link").First().Attr("href")
+		req = NewRequest(t, "GET", latestCommit)
+		resp = session.MakeRequest(t, req, http.StatusOK)
+
+		doc = NewHTMLParser(t, resp.Body).doc
+
+		// Find the 'Git LFS' label.
+		fileNameDiffBar := doc.Find(".diff-file-name").Last().Text()
+		assert.Contains(t, fileNameDiffBar, "Git LFS")
 	})
 
-	// check that a directory with a README file shows its text
+	// check that a directory with a README file shows its text and that the diff
+	// view also shows the 'Git LFS' label
 	t.Run("Readme", func(t *testing.T) {
 		defer tests.PrintCurrentTest(t)()
 
@@ -87,9 +141,25 @@ func TestLFSRender(t *testing.T) {
 
 		content := doc.Find("div.file-view").Text()
 		assert.Contains(t, content, "Testing READMEs in LFS")
+
+		// View file in diff by obtaining latest commit
+		req = NewRequest(t, "GET", "/user2/lfs/commits/branch/master/subdir/README.md")
+		resp = session.MakeRequest(t, req, http.StatusOK)
+
+		// Parse the 'History' page, navigate to latest commit and view its diff.
+		doc = NewHTMLParser(t, resp.Body).doc
+		latestCommit, _ := doc.Find(".default-link").First().Attr("href")
+		req = NewRequest(t, "GET", latestCommit)
+		resp = session.MakeRequest(t, req, http.StatusOK)
+
+		doc = NewHTMLParser(t, resp.Body).doc
+
+		// Find the 'Git LFS' label.
+		fileNameDiffBar := doc.Find(".diff-file-name").Last().Text()
+		assert.Contains(t, fileNameDiffBar, "Git LFS")
 	})
 
-	t.Run("/settings/lfs/pointers", func(t *testing.T) {
+	t.Run("Pointer and Find View", func(t *testing.T) {
 		defer tests.PrintCurrentTest(t)()
 
 		// visit /user2/lfs/settings/lfs/pointer
@@ -97,6 +167,7 @@ func TestLFSRender(t *testing.T) {
 		resp := session.MakeRequest(t, req, http.StatusOK)
 
 		// follow the first link to /user2/lfs/settings/lfs/find?oid=....
+		// (to get to the 'Find commits' view)
 		filesTable := NewHTMLParser(t, resp.Body).doc.Find("#lfs-files-table")
 		assert.Contains(t, filesTable.Text(), "Find commits")
 		lfsFind := filesTable.Find(`.primary.button[href^="/user2"]`)
@@ -108,7 +179,24 @@ func TestLFSRender(t *testing.T) {
 		req = NewRequest(t, "GET", lfsFindPath)
 		resp = session.MakeRequest(t, req, http.StatusOK)
 		doc := NewHTMLParser(t, resp.Body).doc
-		assert.Equal(t, 1, doc.Find(`.sha.label[href="/user2/lfs/commit/73cf03db6ece34e12bf91e8853dc58f678f2f82d"]`).Length(), "could not find link to commit")
+
+		// Check name
+		lfsFilename := doc.Find(`a[href^="/user2/lfs/src/commit/73cf03db6ece34e12bf91e8853dc58f678f2f82d/subdir/README.md"]`).Text()
+		assert.NotNil(t, lfsFilename, "could not find file link")
+		assert.Equal(t, "subdir/README.md", lfsFilename, "incorrect file name")
+
+		// Check branch
+		branchString := doc.Find(`a[href^="/user2/lfs/src/branch/master"]`).Text()
+		assert.NotNil(t, branchString, "could not find branch link")
+		assert.Equal(t, "master", branchString, "incorrect branch")
+
+		// Check SHA
+		shortShaString := doc.Find(`a[href^="/user2/lfs/commit/73cf03db6ece34e12bf91e8853dc58f678f2f82d"]`).Text()
+		assert.NotNil(t, shortShaString, "could not find sha link")
+		assert.Equal(t, "73cf03db6e", shortShaString, "incorrect sha")
+
+		// Check date
+		assert.Equal(t, "2022-12-21", doc.Find(`td[data-test-name="date"]`).Text())
 	})
 
 	// check that an invalid lfs entry defaults to plaintext

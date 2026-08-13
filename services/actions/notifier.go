@@ -5,7 +5,6 @@ package actions
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	actions_model "forgejo.org/models/actions"
@@ -22,7 +21,6 @@ import (
 	"forgejo.org/modules/repository"
 	"forgejo.org/modules/setting"
 	api "forgejo.org/modules/structs"
-	"forgejo.org/modules/util"
 	webhook_module "forgejo.org/modules/webhook"
 	"forgejo.org/services/convert"
 	notify_service "forgejo.org/services/notify"
@@ -385,7 +383,11 @@ func (n *actionsNotifier) NewPullRequest(ctx context.Context, pull *issues_model
 
 	permission, _ := access_model.GetUserRepoPermission(ctx, pull.Issue.Repo, pull.Issue.Poster)
 
+	// HeadCommitID is transient and needs to be set before invoking PullRequestSynchronized. Otherwise,
+	// notifier_helper.go will rediscover the head commit when it's running. Because that happens sometime in the
+	// future, it might discover a newer commit.
 	newNotifyInputFromIssue(pull.Issue, webhook_module.HookEventPullRequest).
+		WithCommit(pull.HeadCommitID).
 		WithPayload(&api.PullRequestPayload{
 			Action:      api.HookIssueOpened,
 			Index:       pull.Issue.Index,
@@ -448,9 +450,11 @@ func (n *actionsNotifier) PullRequestReview(ctx context.Context, pr *issues_mode
 		reviewHookType = webhook_module.HookEventPullRequestReviewComment
 	case issues_model.ReviewTypeReject:
 		reviewHookType = webhook_module.HookEventPullRequestReviewRejected
+	case issues_model.ReviewTypePending, issues_model.ReviewTypeRequest, issues_model.ReviewTypeUnknown:
+		log.Trace("Ignoring review type %v", review.Type)
+		return
 	default:
-		// unsupported review webhook type here
-		log.Error("Unsupported review webhook type")
+		log.Error("Unhandled review type: %v", review.Type)
 		return
 	}
 
@@ -732,7 +736,11 @@ func (n *actionsNotifier) PullRequestSynchronized(ctx context.Context, doer *use
 		return
 	}
 
+	// HeadCommitID is transient and needs to be set before invoking PullRequestSynchronized. Otherwise,
+	// notifier_helper.go will rediscover the head commit when it's running. Because that happens sometime in the
+	// future, it might discover a newer commit.
 	NewNotifyInput(pr.Issue.Repo, doer, webhook_module.HookEventPullRequestSync).
+		WithCommit(pr.HeadCommitID).
 		WithPayload(&api.PullRequestPayload{
 			Action:      api.HookIssueSynchronized,
 			Index:       pr.Issue.Index,
@@ -829,20 +837,10 @@ func (n *actionsNotifier) MigrateRepository(ctx context.Context, doer, u *user_m
 // the ActionRun of the same workflow that finished before priorRun/updatedRun.
 func sendActionRunNowDoneNotificationIfNeeded(ctx context.Context, priorRun, updatedRun *actions_model.ActionRun) error {
 	if !priorRun.Status.IsDone() && updatedRun.Status.IsDone() {
-		lastRun, err := actions_model.GetRunBefore(ctx, updatedRun)
-		if err != nil && !errors.Is(err, util.ErrNotExist) {
+		if err := updatedRun.LoadAttributes(ctx); err != nil {
 			return err
 		}
-		// when no last run was found lastRun is nil
-		if lastRun != nil {
-			if err = lastRun.LoadAttributes(ctx); err != nil {
-				return err
-			}
-		}
-		if err = updatedRun.LoadAttributes(ctx); err != nil {
-			return err
-		}
-		notify_service.ActionRunNowDone(ctx, updatedRun, priorRun.Status, lastRun)
+		notify_service.ActionRunNowDone(ctx, updatedRun, priorRun.Status)
 	}
 	return nil
 }
@@ -857,7 +855,7 @@ func calculateWarnings(run *actions_model.ActionRun, swfs []*jobparser.SingleWor
 		// harm in handling it here. (https://code.forgejo.org/forgejo/runner/issues/1579)
 		if j != nil && swf.HasPermissions() {
 			warnings = append(warnings, actions_model.WarningCodePermissions)
-			warningDetails = append(warningDetails, []any{id, "https://forgejo.org/docs/latest/user/authorized-integrations/"})
+			warningDetails = append(warningDetails, []any{id, "https://forgejo.org/docs/latest/user/api/authorized-integrations/"})
 		}
 	}
 	run.PreExecutionWarningCodes = warnings

@@ -704,9 +704,11 @@ func (m *webhookNotifier) PullRequestReview(ctx context.Context, pr *issues_mode
 		reviewHookType = webhook_module.HookEventPullRequestReviewComment
 	case issues_model.ReviewTypeReject:
 		reviewHookType = webhook_module.HookEventPullRequestReviewRejected
+	case issues_model.ReviewTypePending, issues_model.ReviewTypeRequest, issues_model.ReviewTypeUnknown:
+		log.Trace("Ignoring review type %v", review.Type)
+		return
 	default:
-		// unsupported review webhook type here
-		log.Error("Unsupported review webhook type")
+		log.Error("Unhandled review type: %v", review.Type)
 		return
 	}
 
@@ -888,7 +890,7 @@ func (m *webhookNotifier) PackageDelete(ctx context.Context, doer *user_model.Us
 	notifyPackage(ctx, doer, pd, api.HookPackageDeleted)
 }
 
-func (m *webhookNotifier) ActionRunNowDone(ctx context.Context, run *actions_model.ActionRun, priorStatus actions_model.Status, lastRun *actions_model.ActionRun) {
+func (m *webhookNotifier) ActionRunNowDone(ctx context.Context, run *actions_model.ActionRun, priorStatus actions_model.Status) {
 	source := EventSource{
 		Repository: run.Repo,
 		Owner:      run.TriggerUser,
@@ -903,7 +905,6 @@ func (m *webhookNotifier) ActionRunNowDone(ctx context.Context, run *actions_mod
 
 	payload := &api.ActionPayload{
 		Run:         convert.ToActionRun(ctx, run, doer),
-		LastRun:     convert.ToActionRun(ctx, lastRun, doer),
 		PriorStatus: priorStatus.String(),
 	}
 
@@ -911,13 +912,6 @@ func (m *webhookNotifier) ActionRunNowDone(ctx context.Context, run *actions_mod
 		payload.Action = api.HookActionSuccess
 		if err := PrepareWebhooks(ctx, source, webhook_module.HookEventActionRunSuccess, payload); err != nil {
 			log.Error("PrepareWebhooks: %v", err)
-		}
-		// send another event when this is a recover
-		if lastRun != nil && !lastRun.Status.IsSuccess() {
-			payload.Action = api.HookActionRecover
-			if err := PrepareWebhooks(ctx, source, webhook_module.HookEventActionRunRecover, payload); err != nil {
-				log.Error("PrepareWebhooks: %v", err)
-			}
 		}
 	} else {
 		payload.Action = api.HookActionFailure

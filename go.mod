@@ -70,7 +70,7 @@ require (
 	github.com/jhillyerd/enmime/v2 v2.2.0
 	github.com/json-iterator/go v1.1.12
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
-	github.com/klauspost/compress v1.19.1
+	github.com/klauspost/compress v1.19.2
 	github.com/markbates/goth v1.82.0
 	github.com/mattn/go-isatty v0.0.24
 	github.com/mattn/go-sqlite3 v1.14.49
@@ -79,6 +79,7 @@ require (
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/minio/minio-go/v7 v7.1.0
 	github.com/msteinert/pam/v2 v2.1.0
+	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/niklasfasching/go-org v1.9.1
 	github.com/olivere/elastic/v7 v7.0.32
 	github.com/opencontainers/go-digest v1.0.0
@@ -86,7 +87,7 @@ require (
 	github.com/pquerna/otp v1.5.0
 	github.com/prometheus/client_golang v1.21.1
 	github.com/redis/go-redis/v9 v9.21.0
-	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/sergi/go-diff v1.4.0
 	github.com/sourcegraph/zoekt v0.0.0-20260114143800-c747a3bccc2a
 	github.com/stretchr/testify v1.11.1
@@ -99,15 +100,15 @@ require (
 	github.com/yuin/goldmark-highlighting/v2 v2.0.0-20230729083705-37449abec8cc
 	gitlab.com/gitlab-org/api/client-go v0.143.2
 	go.yaml.in/yaml/v3 v3.0.5
-	golang.org/x/crypto v0.54.0
-	golang.org/x/image v0.44.0
+	golang.org/x/crypto v0.55.0
+	golang.org/x/image v0.45.0
 	golang.org/x/net v0.57.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.22.0
 	golang.org/x/sys v0.47.0
-	golang.org/x/text v0.40.0
+	golang.org/x/text v0.41.0
 	golang.org/x/tools v0.48.0
-	google.golang.org/protobuf v1.36.11
+	google.golang.org/protobuf v1.36.12
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 	gopkg.in/ini.v1 v1.67.3
 	mvdan.cc/xurls/v2 v2.6.0
@@ -215,7 +216,6 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mrjones/oauth v0.0.0-20190623134757-126b35219450 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
-	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nwaples/rardecode/v2 v2.2.0 // indirect
 	github.com/olekukonko/errors v1.1.0 // indirect
 	github.com/olekukonko/ll v0.0.9 // indirect

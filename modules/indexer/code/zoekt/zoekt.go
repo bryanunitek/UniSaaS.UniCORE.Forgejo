@@ -94,7 +94,7 @@ func (b *Indexer) addDelete(builder *index.Builder, filename string) {
 	builder.MarkFileAsChangedOrRemoved(filename)
 }
 
-func (b *Indexer) addUpdate(ctx context.Context, builder *index.Builder, batchWriter git.WriteCloserError, batchReader *bufio.Reader, update internal.FileUpdate, repo *repo_model.Repository) error {
+func (b *Indexer) addUpdate(ctx context.Context, builder *index.Builder, batchWriter io.Writer, batchReader *bufio.Reader, update internal.FileUpdate, repo *repo_model.Repository) error {
 	// Ignore vendored files in code search
 	if setting.Indexer.ExcludeVendored && analyze.IsVendor(update.Filename) {
 		return nil
@@ -178,16 +178,17 @@ func (b *Indexer) Index(ctx context.Context, repo *repo_model.Repository, sha st
 			return err
 		}
 		defer r.Close()
-		batch, err := r.NewBatch(ctx)
-		if err != nil {
-			return err
-		}
-		defer batch.Close()
-		for _, update := range changes.Updates {
-			err := b.addUpdate(ctx, builder, batch.Writer, batch.Reader, update, repo)
-			if err != nil {
-				return err
+
+		if err := r.WithCatFileBatch(ctx, func(w io.Writer, r *bufio.Reader) error {
+			for _, update := range changes.Updates {
+				err := b.addUpdate(ctx, builder, w, r, update, repo)
+				if err != nil {
+					return err
+				}
 			}
+			return nil
+		}); err != nil {
+			return nil
 		}
 	}
 
@@ -464,19 +465,14 @@ func (f *zoektFormatter) Format(r *internal.SearchResult) (*internal.Result, err
 	}
 	lineOffsets = append(lineOffsets, len(r.Content)) // end offset for the last line
 
-	// Line numbers (1-based)
-	lineNumbers := make([]int, len(lineOffsets)-1)
-	for i := range lineNumbers {
-		lineNumbers[i] = i + 1
-	}
+	// Line numbers are 1-based, last line is totalLines
+	totalLines := len(lineOffsets) - 1
 
-	// Collect all lines to display (+/- 1 line around each match)
+	// Collect all lines to display (+/- 1 line around each match), clamped to the file bounds
 	sortedLines := make([]int, 0, len(r.Matches)*3)
 	for _, m := range r.Matches {
-		for i := m.LineNumber - 1; i <= m.LineNumber+1; i++ {
-			if i > 0 {
-				sortedLines = append(sortedLines, i)
-			}
+		for i := max(m.LineNumber-1, 1); i <= min(m.LineNumber+1, totalLines); i++ {
+			sortedLines = append(sortedLines, i)
 		}
 	}
 
