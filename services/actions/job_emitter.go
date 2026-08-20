@@ -289,7 +289,8 @@ func prepareJobForEmitting(ctx context.Context, blockedJob *actions_model.Action
 			// Unexpected: `job` is needed by `blockedJob` but it isn't done; `jobStatusResolver` shouldn't be calling
 			// `prepareJobForEmitting` in this case.
 			return behaviourError, fmt.Errorf(
-				"jobStatusResolver attempted to prepareJobForEmitting for a job (id=%d) with an incomplete 'needs' job (id=%d)", blockedJob.ID, job.ID)
+				"jobStatusResolver attempted to prepareJobForEmitting for a job (id=%d) with an incomplete 'needs' job (id=%d)", blockedJob.ID, job.ID,
+			)
 		}
 
 		outputs, err := actions_model.FindTaskOutputByTaskID(ctx, job.TaskID)
@@ -312,7 +313,7 @@ func prepareJobForEmitting(ctx context.Context, blockedJob *actions_model.Action
 
 	// Re-parse the blocked job, providing all the other completed jobs' outputs, to turn this incomplete job into
 	// one-or-more new jobs:
-	expandLocalReusableWorkflow, expandCleanup := lazyRepoExpandLocalReusableWorkflow(ctx, blockedJob.RepoID, blockedJob.CommitSHA)
+	expandLocalReusableWorkflow, expandCleanup := lazyRepoExpandLocalReusableWorkflow(ctx, blockedJob.RepoID, blockedJob.Run.GetWorkflowSourceCommit())
 	defer expandCleanup()
 	newJobWorkflows, err := jobparser.Parse(blockedJob.WorkflowPayload, false,
 		jobparser.WithJobOutputs(jobOutputs),
@@ -333,7 +334,8 @@ func prepareJobForEmitting(ctx context.Context, blockedJob *actions_model.Action
 			ctx,
 			blockedJob.Run,
 			actions_model.ErrorCodeJobParsingError,
-			[]any{err.Error()}); err != nil {
+			[]any{err.Error()},
+		); err != nil {
 			return behaviourError, fmt.Errorf("setting run into PreExecutionError state failed: %w", err)
 		}
 		// `FailRunPreExecutionError` will mark all the pending runs in the job failed; ignore all of them.
