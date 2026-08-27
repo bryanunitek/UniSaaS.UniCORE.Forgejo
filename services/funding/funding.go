@@ -73,7 +73,7 @@ func getFundingEntry(provider *setting.FundingProviderConfig, input string) (*ap
 	input = strings.TrimSpace(input)
 
 	if !provider.InputPattern.Match([]byte(input)) {
-		return nil, ErrBadInput{Name: provider.Name, Pattern: provider.InputPattern}
+		return nil, BadInputError{Name: provider.Name, Pattern: provider.InputPattern}
 	}
 
 	// user input + provider.Template = funding entry value!
@@ -81,19 +81,18 @@ func getFundingEntry(provider *setting.FundingProviderConfig, input string) (*ap
 
 	// Expecting (for now) that the value is to be treated as a URL
 	if !strings.Contains(rawValue, "://") {
-		// assume HTTP before parsing (otherwise, url.Parse may think the *hostname* is the scheme!)
-		rawValue = "http://" + rawValue
+		// assume HTTPS before parsing (otherwise, url.Parse may think the *hostname* is the scheme!)
+		rawValue = "https://" + rawValue
 	}
 
 	urlValue, err := url.Parse(rawValue) // value should parse as a URL; interpolation should never result in something invalid
 	if err != nil {
-		return nil, ErrCannotParseURL{Name: provider.Name, Err: err}
+		return nil, CannotParseURLError{Name: provider.Name, Err: err}
 	}
 
-	// TODO: Look into whether this should also respect setting.Service.ValidSiteURLSchemes
-	validSchemes := []string{"http", "https"}
+	validSchemes := setting.Service.ValidSiteURLSchemes
 	if !slices.Contains(validSchemes, urlValue.Scheme) {
-		return nil, ErrCannotParseURL{Name: provider.Name, Err: &ErrBadURLScheme{
+		return nil, CannotParseURLError{Name: provider.Name, Err: &BadURLSchemeError{
 			ValidSchemes: validSchemes,
 			GivenScheme:  urlValue.Scheme,
 		}}
@@ -101,13 +100,19 @@ func getFundingEntry(provider *setting.FundingProviderConfig, input string) (*ap
 
 	urlValue, err = withASCIIHostname(urlValue)
 	if err != nil {
-		return nil, ErrCannotParseURL{Name: provider.Name, Err: err}
+		return nil, CannotParseURLError{Name: provider.Name, Err: err}
 	}
 
 	entry := new(api.RepoFundingEntry)
 	entry.ProviderName = provider.Name
-	entry.Title = fmt.Sprintf(provider.Title, input)
 	entry.Value = urlValue.String()
+	if provider.Name == "custom" {
+		// "custom" entries are distinct from other funding providers in that their URL value is always displayed in full, including scheme and punycode transformations
+		// (we ignore provider.Title here for "custom"'s special behavior)
+		entry.Title = urlValue.String()
+	} else {
+		entry.Title = fmt.Sprintf(provider.Title, input)
+	}
 
 	return entry, nil
 }
@@ -152,15 +157,11 @@ func GetFundingFromPath(r *repo_model.Repository, path string, commit *git.Commi
 
 	configPath = fmt.Sprintf("%s/src/branch/%s/%s", r.Link(), util.PathEscapeSegments(r.DefaultBranch), configPath)
 
-	data, lineErrors, err := getFundingFromBlob(configContent)
-	if err != nil {
-		return nil, err
-	}
-
+	data, errors := getFundingFromBlob(configContent)
 	funding := &RepoFunding{
 		ConfigPath: configPath,
 		Entries:    data,
-		Errors:     lineErrors,
+		Errors:     errors,
 	}
 	return funding, nil
 }
@@ -172,13 +173,13 @@ func GetFundingFromCommit(r *repo_model.Repository, commit *git.Commit) (*RepoFu
 		}
 	}
 
-	return nil, ErrFundingNotExist{Repo: r}
+	return nil, NotExistError{Repo: r}
 }
 
 // GetFundingFromDefaultBranch returns the funding for this repo.
 func GetFundingFromDefaultBranch(ctx context.Context, r *repo_model.Repository) (*RepoFunding, error) {
 	if r.IsEmpty {
-		return nil, ErrFundingNotExist{Repo: r}
+		return nil, NotExistError{Repo: r}
 	}
 
 	gitRepo, err := git.OpenRepository(ctx, r.RepoPath())
@@ -189,6 +190,9 @@ func GetFundingFromDefaultBranch(ctx context.Context, r *repo_model.Repository) 
 
 	commit, err := gitRepo.GetBranchCommit(r.DefaultBranch)
 	if err != nil {
+		if git.IsErrNotExist(err) {
+			return nil, NotExistError{Repo: r}
+		}
 		return nil, err
 	}
 

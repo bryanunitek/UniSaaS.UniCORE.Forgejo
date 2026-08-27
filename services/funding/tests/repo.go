@@ -28,8 +28,8 @@ func assertEntriesMatchConfig1(t *testing.T, repo *repo_model.Repository, fnd *f
 	assert.Len(t, fnd.Entries, 1)
 	entry := fnd.Entries[0]
 	assert.Equal(t, "custom", entry.ProviderName)
-	assert.Equal(t, "test.local", entry.Title)
-	assert.Equal(t, "http://test.local", entry.Value)
+	assert.Equal(t, "https://test.local", entry.Title)
+	assert.Equal(t, "https://test.local", entry.Value)
 }
 
 // This is called from tests/integration/funding_retrievers_test.go
@@ -59,7 +59,7 @@ func FromDefaultBranch(t *testing.T) {
 		fnd, err := funding.GetFundingFromDefaultBranch(t.Context(), repo)
 		require.Nil(t, fnd)
 		require.Error(t, err)
-		assert.ErrorIs(t, err, funding.ErrFundingNotExist{})
+		assert.True(t, funding.IsNotExistError(err))
 	})
 
 	t.Run("init repo", func(t *testing.T) {
@@ -70,7 +70,7 @@ func FromDefaultBranch(t *testing.T) {
 		fnd, err := funding.GetFundingFromDefaultBranch(t.Context(), repo)
 		require.Nil(t, fnd)
 		require.Error(t, err)
-		assert.ErrorIs(t, err, funding.ErrFundingNotExist{})
+		assert.True(t, funding.IsNotExistError(err))
 	})
 
 	for _, subURL := range subURLs {
