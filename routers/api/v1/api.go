@@ -123,39 +123,7 @@ func sudo() func(ctx *context.APIContext) {
 	}
 }
 
-func repoAssignment(ctx *context.APIContext) {
-	apiv1_permissions_testhelpers.FollowedBy(repoAssignment, apiv1_permissions.RepoAccess)
-	userName := ctx.Params("username")
-	repoName := ctx.Params("reponame")
-
-	var (
-		owner *user_model.User
-		err   error
-	)
-
-	// Check if the user is the same as the repository owner.
-	if ctx.IsSigned() && ctx.Doer().LowerName == strings.ToLower(userName) {
-		owner = ctx.Doer()
-	} else {
-		owner, err = user_model.GetUserByName(ctx, userName)
-		if err != nil {
-			if user_model.IsErrUserNotExist(err) {
-				if redirectUserID, err := redirect_service.LookupUserRedirect(ctx, ctx.Doer(), userName); err == nil {
-					context.RedirectToUser(ctx.Base, userName, redirectUserID)
-				} else if user_model.IsErrUserRedirectNotExist(err) {
-					ctx.NotFound("GetUserByName", err)
-				} else {
-					ctx.Error(http.StatusInternalServerError, "LookupRedirect", err)
-				}
-			} else {
-				ctx.Error(http.StatusInternalServerError, "GetUserByName", err)
-			}
-			return
-		}
-	}
-	ctx.Repo().Owner = owner
-	ctx.SetUser(owner)
-
+func repoAssignment(ctx *context.APIContext, owner *user_model.User, repoName string) {
 	// Get repository.
 	repo, err := repo_model.GetRepositoryByName(ctx, owner.ID, repoName)
 	if err != nil {
@@ -176,6 +144,50 @@ func repoAssignment(ctx *context.APIContext) {
 
 	repo.Owner = owner
 	ctx.Repo().Repository = repo
+	ctx.Repo().Owner = owner
+}
+
+func userAssignment(ctx *context.APIContext, userName string) {
+	user, err := user_model.GetUserByName(ctx, userName)
+	if err != nil {
+		if user_model.IsErrUserNotExist(err) {
+			if redirectUserID, err := redirect_service.LookupUserRedirect(ctx, ctx.Doer(), userName); err == nil {
+				context.RedirectToUser(ctx.Base, userName, redirectUserID)
+			} else if user_model.IsErrUserRedirectNotExist(err) {
+				ctx.NotFound("GetUserByName", err)
+			} else {
+				ctx.Error(http.StatusInternalServerError, "LookupRedirect", err)
+			}
+		} else {
+			ctx.Error(http.StatusInternalServerError, "GetUserByName", err)
+		}
+		return
+	}
+	ctx.SetUser(user)
+}
+
+func repoAndOwnerAssignment(ownerNameParam, repoNameParam string) func(ctx *context.APIContext) {
+	apiv1_permissions_testhelpers.FollowedBy(repoAndOwnerAssignment, apiv1_permissions.RepoAccess)
+	return func(ctx *context.APIContext) {
+		ownerName := ctx.Params(ownerNameParam)
+		repoName := ctx.Params(repoNameParam)
+
+		var owner *user_model.User
+
+		// Check if the owner is the same as the repository owner.
+		if ctx.IsSigned() && ctx.Doer().LowerName == strings.ToLower(ownerName) {
+			owner = ctx.Doer()
+			ctx.SetUser(owner)
+		} else {
+			userAssignment(ctx, ownerName)
+			if ctx.Written() {
+				return
+			}
+			owner = ctx.User()
+		}
+
+		repoAssignment(ctx, owner, repoName)
+	}
 }
 
 func repoAccess() func(ctx *context.APIContext) {
@@ -231,6 +243,36 @@ func reqIssueUnlockedOrCanWrite(indexParam string) func(ctx *context.APIContext)
 			return
 		}
 		apiv1_permissions.ReqIssueUnlockedOrCanWrite(ctx, issue)
+	}
+}
+
+func reqEditIssue(indexParam string) func(ctx *context.APIContext) {
+	apiv1_permissions_testhelpers.RecordSignature(apiv1_permissions.ReqEditIssue)
+	return func(ctx *context.APIContext) {
+		issue := ctx.LoadIssue(indexParam)
+		if ctx.Written() {
+			return
+		}
+		apiv1_permissions.ReqEditIssue(ctx, issue, web.GetForm(ctx).(*api.EditIssueOption))
+	}
+}
+
+// hack in the sense that it should fail hard but instead silently does nothing
+// it would be a breaking change to remove this hack
+func hackEditIssue(indexParam string) func(ctx *context.APIContext) {
+	return func(ctx *context.APIContext) {
+		issue := ctx.LoadIssue(indexParam)
+		if ctx.Written() {
+			return
+		}
+		canWrite := !issue.IsLocked && ctx.Permission().CanWriteIssuesOrPulls(issue.IsPull)
+		if !canWrite {
+			form := web.GetForm(ctx).(*api.EditIssueOption)
+			form.Assignee = nil
+			form.Assignees = nil
+			form.Deadline = nil
+			form.RemoveDeadline = nil
+		}
 	}
 }
 
@@ -401,6 +443,15 @@ func orgAssignment(ctx *context.APIContext) {
 	} else {
 		ctx.Org().Organization = org
 		ctx.SetUser(ctx.Org().Organization.AsUser())
+	}
+}
+
+func orgRepoAssignment(repoNameParam string) func(ctx *context.APIContext) {
+	apiv1_permissions_testhelpers.FollowedBy(orgRepoAssignment, apiv1_permissions.RepoAccess)
+	return func(ctx *context.APIContext) {
+		repoName := ctx.Params(repoNameParam)
+
+		repoAssignment(ctx, ctx.Org().Organization.AsUser(), repoName)
 	}
 }
 
@@ -655,33 +706,11 @@ func Routes() *web.Route {
 				Post(bind(api.CreateEmailOption{}), user.AddEmail).
 				Delete(bind(api.DeleteEmailOption{}), user.DeleteEmail)
 
-			// manage user-level actions features
-			m.Group("/actions", func() {
-				m.Group("/secrets", func() {
-					m.Combo("/{secretname}").
-						Put(bind(api.CreateOrUpdateSecretOption{}), user.CreateOrUpdateSecret).
-						Delete(user.DeleteSecret)
-				})
-
-				m.Group("/variables", func() {
-					m.Get("", user.ListVariables)
-					m.Combo("/{variablename}").
-						Get(user.GetVariable).
-						Delete(user.DeleteVariable).
-						Post(bind(api.CreateVariableOption{}), user.CreateVariable).
-						Put(bind(api.UpdateVariableOption{}), user.UpdateVariable)
-				})
-
-				m.Group("/runners", func() {
-					m.Combo("").
-						Get(reqToken(), user.ListRunners).
-						Post(bind(api.RegisterRunnerOptions{}), user.RegisterRunner)
-					m.Get("/registration-token", reqToken(), user.GetRegistrationToken) //nolint:staticcheck
-					m.Get("/{runner_id}", reqToken(), user.GetRunner)
-					m.Delete("/{runner_id}", reqToken(), user.DeleteRunner)
-					m.Get("/jobs", reqToken(), user.SearchActionRunJobs)
-				})
-			})
+			addActionsRoutes(
+				m,
+				func(ctx *context.APIContext) {},
+				user.NewAction(),
+			)
 
 			m.Get("/followers", user.ListMyFollowers)
 			m.Group("/following", func() {
@@ -739,7 +768,7 @@ func Routes() *web.Route {
 						m.Get("", user.IsStarring)
 						m.Put("", user.Star)
 						m.Delete("", user.Unstar)
-					}, repoAssignment, repoAccess(), checkTokenPublicOnly())
+					}, repoAndOwnerAssignment("username", "reponame"), repoAccess(), checkTokenPublicOnly())
 				}, tokenRequiresScopes(auth_model.AccessTokenScopeCategoryRepository))
 			}
 			m.Get("/times", repo.ListMyTrackedTimes)
@@ -782,7 +811,7 @@ func Routes() *web.Route {
 
 		// Needs to be extracted from the larger `/repos` group because deleting a repo isn't protected by
 		// `AccessTokenScopeCategoryRepository`; it's protected by either the User or Organization scope.
-		m.Delete("/repos/{username}/{reponame}", repoAssignment, repoAccess(), tokenRequiresRepoOwnerScope(), reqOwner(), repo.Delete)
+		m.Delete("/repos/{username}/{reponame}", repoAndOwnerAssignment("username", "reponame"), repoAccess(), tokenRequiresRepoOwnerScope(), reqOwner(), repo.Delete)
 
 		// Repos (requires repo scope)
 		m.Group("/repos", func() {
@@ -1098,7 +1127,7 @@ func Routes() *web.Route {
 				})
 
 				m.Get("/{ball_type:tarball|zipball|bundle}/*", reqRepoReader(unit.TypeCode), repo.DownloadArchive)
-			}, repoAssignment, repoAccess(), checkTokenPublicOnly())
+			}, repoAndOwnerAssignment("username", "reponame"), repoAccess(), checkTokenPublicOnly())
 		}, tokenRequiresScopes(auth_model.AccessTokenScopeCategoryRepository))
 
 		// Notifications (requires notifications scope)
@@ -1107,7 +1136,7 @@ func Routes() *web.Route {
 				m.Combo("/notifications", reqToken()).
 					Get(notify.ListRepoNotifications).
 					Put(notify.ReadRepoNotifications)
-			}, repoAssignment, repoAccess(), checkTokenPublicOnly())
+			}, repoAndOwnerAssignment("username", "reponame"), repoAccess(), checkTokenPublicOnly())
 		}, tokenRequiresScopes(auth_model.AccessTokenScopeCategoryNotification))
 
 		// Issue (requires issue scope)
@@ -1143,7 +1172,7 @@ func Routes() *web.Route {
 					})
 					m.Group("/{index}", func() {
 						m.Combo("").Get(repo.GetIssue).
-							Patch(reqToken(), bind(api.EditIssueOption{}), repo.EditIssue).
+							Patch(reqToken(), mustNotBeArchived(), bind(api.EditIssueOption{}), hackEditIssue("index"), reqEditIssue("index"), repo.EditIssue).
 							Delete(reqToken(), reqAdmin(), context.ReferencesGitRepo(), repo.DeleteIssue)
 						m.Group("/comments", func() {
 							m.Combo("").Get(repo.ListIssueComments).
@@ -1223,7 +1252,7 @@ func Routes() *web.Route {
 						Patch(reqToken(), reqRepoWriter(unit.TypeIssues, unit.TypePullRequests), bind(api.EditMilestoneOption{}), repo.EditMilestone).
 						Delete(reqToken(), reqRepoWriter(unit.TypeIssues, unit.TypePullRequests), repo.DeleteMilestone)
 				})
-			}, repoAssignment, repoAccess(), checkTokenPublicOnly())
+			}, repoAndOwnerAssignment("username", "reponame"), repoAccess(), checkTokenPublicOnly())
 		}, tokenRequiresScopes(auth_model.AccessTokenScopeCategoryIssue))
 
 		// NOTE: these are Gitea package management API - see packages.CommonRoutes and packages.DockerContainerRoutes for endpoints that implement package manager APIs
@@ -1329,9 +1358,9 @@ func Routes() *web.Route {
 			})
 			m.Group("/repos", func() {
 				m.Get("", reqToken(), org.GetTeamRepos)
-				m.Combo("/{org}/{reponame}").
-					Put(reqToken(), org.AddTeamRepository).
-					Delete(reqToken(), org.RemoveTeamRepository).
+				m.Combo("/{org}/{reponame}", orgAssignment, orgRepoAssignment("reponame"), repoAccess()).
+					Put(reqToken(), reqAdmin(), org.AddTeamRepository).
+					Delete(reqToken(), reqAdmin(), org.RemoveTeamRepository).
 					Get(reqToken(), org.GetTeamRepo)
 			})
 			m.Get("/activities/feeds", org.ListTeamActivityFeeds)

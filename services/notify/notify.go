@@ -70,9 +70,9 @@ func NewIssue(ctx context.Context, issue *issues_model.Issue, mentions []*user_m
 }
 
 // IssueChangeStatus notifies close or reopen issue to notifiers
-func IssueChangeStatus(ctx context.Context, doer *user_model.User, commitID string, issue *issues_model.Issue, actionComment *issues_model.Comment, closeOrReopen bool) {
+func IssueChangeStatus(ctx context.Context, doer *user_model.User, prInfo *issues_model.PRNotificationInfo, issue *issues_model.Issue, actionComment *issues_model.Comment, closeOrReopen bool) {
 	for _, notifier := range notifiers {
-		notifier.IssueChangeStatus(ctx, doer, commitID, issue, actionComment, closeOrReopen)
+		notifier.IssueChangeStatus(ctx, doer, prInfo, issue, actionComment, closeOrReopen)
 	}
 }
 
@@ -404,8 +404,38 @@ func ActionRunNowDone(ctx context.Context, run *actions_model.ActionRun, priorSt
 	}
 }
 
-func WorkflowRunEvent(ctx context.Context, event actions_model.ActionRunEvent) {
+func NewWorkflowRunAttempt(ctx context.Context, run *actions_model.ActionRun) {
 	for _, notifier := range notifiers {
-		notifier.WorkflowRunEvent(ctx, event)
+		notifier.NewWorkflowRunAttempt(ctx, run)
+	}
+}
+
+func WorkflowRunStatusChanged(ctx context.Context, run *actions_model.ActionRun, priorStatus actions_model.Status) {
+	for _, notifier := range notifiers {
+		notifier.WorkflowRunStatusChanged(ctx, run, priorStatus)
+	}
+}
+
+func WorkflowRunCompleted(ctx context.Context, run *actions_model.ActionRun, priorStatus actions_model.Status) {
+	for _, notifier := range notifiers {
+		notifier.WorkflowRunCompleted(ctx, run, priorStatus)
+	}
+}
+
+func NewWorkflowJobAttempt(ctx context.Context, job *actions_model.ActionRunJob) {
+	for _, notifier := range notifiers {
+		notifier.NewWorkflowJobAttempt(ctx, job)
+	}
+}
+
+func WorkflowJobStatusChanged(ctx context.Context, job *actions_model.ActionRunJob, priorStatus actions_model.Status) {
+	for _, notifier := range notifiers {
+		notifier.WorkflowJobStatusChanged(ctx, job, priorStatus)
+	}
+}
+
+func WorkflowJobCompleted(ctx context.Context, job *actions_model.ActionRunJob, priorStatus actions_model.Status) {
+	for _, notifier := range notifiers {
+		notifier.WorkflowJobCompleted(ctx, job, priorStatus)
 	}
 }

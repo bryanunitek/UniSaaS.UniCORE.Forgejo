@@ -8,10 +8,15 @@ import (
 	"time"
 
 	actions_model "forgejo.org/models/actions"
+	repo_model "forgejo.org/models/repo"
 	"forgejo.org/models/unittest"
+	user_model "forgejo.org/models/user"
+	"forgejo.org/modules/timeutil"
 	notify_service "forgejo.org/services/notify"
 
+	"code.forgejo.org/forgejo/runner/v13/act/jobparser"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,6 +24,14 @@ func TestActions_CancelOrApproveRun(t *testing.T) {
 	t.Run("run, job and task Running changes to run, job and task Cancelled", func(t *testing.T) {
 		defer unittest.OverrideFixtures("services/actions/TestActions_CancelOrApproveRun")()
 		require.NoError(t, unittest.PrepareTestDatabase())
+
+		notifier := notify_service.NewMockNotifier(t)
+		notifier.On("Run").Return().Maybe()
+		notifier.On("WorkflowJobCompleted", mock.Anything, mock.Anything, mock.Anything).Return()
+		notifier.On("WorkflowRunCompleted", mock.Anything, mock.Anything, mock.Anything).Return()
+
+		notify_service.RegisterNotifier(notifier)
+		defer notify_service.UnregisterNotifier(notifier)
 
 		taskID := int64(711900)
 		task := unittest.AssertExistsAndLoadBean(t, &actions_model.ActionTask{ID: taskID})
@@ -38,6 +51,24 @@ func TestActions_CancelOrApproveRun(t *testing.T) {
 		assert.NotZero(t, job.Stopped)
 		task = unittest.AssertExistsAndLoadBean(t, &actions_model.ActionTask{ID: taskID})
 		require.Equal(t, actions_model.StatusCancelled.String(), task.Status.String())
+
+		notifier.AssertNumberOfCalls(t, "WorkflowJobCompleted", 1)
+		notifier.AssertNumberOfCalls(t, "WorkflowRunCompleted", 1)
+
+		notifier.AssertCalled(
+			t, "WorkflowJobCompleted", mock.Anything,
+			mock.MatchedBy(func(job *actions_model.ActionRunJob) bool {
+				return job.ID == task.JobID && job.Status == actions_model.StatusCancelled
+			}),
+			actions_model.StatusRunning,
+		)
+		notifier.AssertCalled(
+			t, "WorkflowRunCompleted", mock.Anything,
+			mock.MatchedBy(func(run *actions_model.ActionRun) bool {
+				return run.ID == job.RunID && run.Status == actions_model.StatusCancelled
+			}),
+			actions_model.StatusRunning,
+		)
 	})
 
 	t.Run("run Running, job and task Success changes to run Cancelled", func(t *testing.T) {
@@ -70,7 +101,7 @@ func TestActions_CancelOrApproveRun(t *testing.T) {
 		job := unittest.AssertExistsAndLoadBean(t, &actions_model.ActionRunJob{ID: jobID})
 		require.Equal(t, actions_model.StatusBlocked.String(), job.Status.String())
 		run := unittest.AssertExistsAndLoadBean(t, &actions_model.ActionRun{ID: job.RunID})
-		require.Equal(t, actions_model.StatusWaiting.String(), run.Status.String())
+		require.Equal(t, actions_model.StatusBlocked.String(), run.Status.String())
 		require.True(t, run.NeedApproval)
 
 		require.NoError(t, CancelRun(t.Context(), run))
@@ -86,11 +117,19 @@ func TestActions_CancelOrApproveRun(t *testing.T) {
 		defer unittest.OverrideFixtures("services/actions/TestActions_CancelOrApproveRun")()
 		require.NoError(t, unittest.PrepareTestDatabase())
 
+		notifier := notify_service.NewMockNotifier(t)
+		notifier.On("Run").Return().Maybe()
+		notifier.On("WorkflowJobStatusChanged", mock.Anything, mock.Anything, mock.Anything).Return()
+		notifier.On("WorkflowRunStatusChanged", mock.Anything, mock.Anything, mock.Anything).Return()
+
+		notify_service.RegisterNotifier(notifier)
+		defer notify_service.UnregisterNotifier(notifier)
+
 		jobID := int64(10800)
 		job := unittest.AssertExistsAndLoadBean(t, &actions_model.ActionRunJob{ID: jobID})
 		require.Equal(t, actions_model.StatusBlocked.String(), job.Status.String())
 		run := unittest.AssertExistsAndLoadBean(t, &actions_model.ActionRun{ID: job.RunID})
-		require.Equal(t, actions_model.StatusWaiting.String(), run.Status.String())
+		require.Equal(t, actions_model.StatusBlocked.String(), run.Status.String())
 		require.True(t, run.NeedApproval)
 
 		doerID := int64(30)
@@ -102,6 +141,24 @@ func TestActions_CancelOrApproveRun(t *testing.T) {
 		assert.Equal(t, doerID, run.ApprovedBy)
 		job = unittest.AssertExistsAndLoadBean(t, &actions_model.ActionRunJob{ID: jobID})
 		assert.Equal(t, actions_model.StatusWaiting, job.Status)
+
+		notifier.AssertNumberOfCalls(t, "WorkflowJobStatusChanged", 1)
+		notifier.AssertNumberOfCalls(t, "WorkflowRunStatusChanged", 1)
+
+		notifier.AssertCalled(
+			t, "WorkflowJobStatusChanged", mock.Anything,
+			mock.MatchedBy(func(job *actions_model.ActionRunJob) bool {
+				return job.ID == 10800 && job.Status == actions_model.StatusWaiting
+			}),
+			actions_model.StatusBlocked,
+		)
+		notifier.AssertCalled(
+			t, "WorkflowRunStatusChanged", mock.Anything,
+			mock.MatchedBy(func(run *actions_model.ActionRun) bool {
+				return run.ID == job.RunID && run.Status == actions_model.StatusWaiting
+			}),
+			actions_model.StatusBlocked,
+		)
 	})
 }
 
@@ -432,7 +489,10 @@ func TestInitiateNextRunAttempt(t *testing.T) {
 		require.NoError(t, unittest.PrepareTestDatabase())
 		unittest.AssertSuccessfulInsert(t, fixtures)
 
-		notifier := &mockNotifier{}
+		notifier := notify_service.NewMockNotifier(t)
+		notifier.On("Run").Return().Maybe()
+		notifier.On("NewWorkflowRunAttempt", mock.Anything, mock.Anything).Return()
+
 		notify_service.RegisterNotifier(notifier)
 		defer notify_service.UnregisterNotifier(notifier)
 
@@ -440,10 +500,6 @@ func TestInitiateNextRunAttempt(t *testing.T) {
 
 		err := InitiateNextRunAttempt(t.Context(), run)
 		require.NoError(t, err)
-
-		assert.Len(t, notifier.events, 1)
-		assert.Equal(t, notifier.events[0], actions_model.NewNewWorkflowRunAttempt(run))
-		assert.NotNil(t, notifier.events[0].GetRun().Repo) // Notifier requires that all attributes have been loaded.
 
 		// Verify that run has been written to database.
 		run = unittest.AssertExistsAndLoadBean(t, &actions_model.ActionRun{ID: 535681})
@@ -454,13 +510,23 @@ func TestInitiateNextRunAttempt(t *testing.T) {
 		assert.Zero(t, run.Stopped)
 		assert.Equal(t, actions_model.DefaultRunPriority, run.Priority)
 		assert.False(t, run.Prioritize)
+
+		notifier.AssertNumberOfCalls(t, "NewWorkflowRunAttempt", 1)
+		notifier.AssertCalled(
+			t, "NewWorkflowRunAttempt", mock.Anything,
+			mock.MatchedBy(func(run *actions_model.ActionRun) bool {
+				return run.ID == 535681 && run.Status == actions_model.StatusWaiting
+			}),
+		)
 	})
 
 	t.Run("Error if active", func(t *testing.T) {
 		require.NoError(t, unittest.PrepareTestDatabase())
 		unittest.AssertSuccessfulInsert(t, fixtures)
 
-		notifier := &mockNotifier{}
+		notifier := notify_service.NewMockNotifier(t)
+		notifier.On("Run").Return().Maybe()
+
 		notify_service.RegisterNotifier(notifier)
 		defer notify_service.UnregisterNotifier(notifier)
 
@@ -469,7 +535,6 @@ func TestInitiateNextRunAttempt(t *testing.T) {
 		err := InitiateNextRunAttempt(t.Context(), run)
 
 		require.ErrorContains(t, err, "cannot prepare next attempt because run 535682 is active")
-		assert.Empty(t, notifier.events)
 	})
 }
 
@@ -492,16 +557,17 @@ func TestRefreshAndPropagateRunStatus(t *testing.T) {
 
 		unittest.AssertSuccessfulInsert(t, job)
 
-		notifier := &mockNotifier{}
+		notifier := notify_service.NewMockNotifier(t)
+		notifier.On("Run").Return().Maybe()
+
 		notify_service.RegisterNotifier(notifier)
 		defer notify_service.UnregisterNotifier(notifier)
 
 		run := unittest.AssertExistsAndLoadBean(t, &actions_model.ActionRun{ID: 535681})
 
-		require.NoError(t, RefreshAndPropagateRunStatus(t.Context(), run))
+		require.NoError(t, RefreshAndPropagateRunStatus(t.Context(), run.ID))
 
 		assert.Equal(t, actions_model.StatusWaiting, run.Status)
-		assert.Empty(t, notifier.events)
 	})
 
 	t.Run("Status change notification", func(t *testing.T) {
@@ -518,18 +584,27 @@ func TestRefreshAndPropagateRunStatus(t *testing.T) {
 
 		unittest.AssertSuccessfulInsert(t, job)
 
-		notifier := &mockNotifier{}
+		notifier := notify_service.NewMockNotifier(t)
+		notifier.On("Run").Return().Maybe()
+		notifier.On("WorkflowRunStatusChanged", mock.Anything, mock.Anything, mock.Anything).Return()
+
 		notify_service.RegisterNotifier(notifier)
 		defer notify_service.UnregisterNotifier(notifier)
 
-		run := unittest.AssertExistsAndLoadBean(t, &actions_model.ActionRun{ID: 535681})
+		require.NoError(t, RefreshAndPropagateRunStatus(t.Context(), job.RunID))
 
-		require.NoError(t, RefreshAndPropagateRunStatus(t.Context(), run))
+		run := unittest.AssertExistsAndLoadBean(t, &actions_model.ActionRun{ID: job.RunID})
 
 		assert.Equal(t, actions_model.StatusRunning, run.Status)
-		assert.Len(t, notifier.events, 1)
-		assert.Equal(t, notifier.events[0], actions_model.NewWorkflowRunStatusChanged(run, actions_model.StatusWaiting))
-		assert.NotNil(t, notifier.events[0].GetRun().Repo) // Notifier requires that all attributes have been loaded.
+
+		notifier.AssertNumberOfCalls(t, "WorkflowRunStatusChanged", 1)
+		notifier.AssertCalled(
+			t, "WorkflowRunStatusChanged", mock.Anything,
+			mock.MatchedBy(func(run *actions_model.ActionRun) bool {
+				return run.ID == 535681 && run.Status == actions_model.StatusRunning && run.Repo != nil
+			}),
+			actions_model.StatusWaiting,
+		)
 	})
 
 	t.Run("Completed notification upon completion", func(t *testing.T) {
@@ -546,17 +621,158 @@ func TestRefreshAndPropagateRunStatus(t *testing.T) {
 
 		unittest.AssertSuccessfulInsert(t, job)
 
-		notifier := &mockNotifier{}
+		notifier := notify_service.NewMockNotifier(t)
+		notifier.On("Run").Return().Maybe()
+		notifier.On("WorkflowRunCompleted", mock.Anything, mock.Anything, mock.Anything).Return()
+
 		notify_service.RegisterNotifier(notifier)
 		defer notify_service.UnregisterNotifier(notifier)
 
-		run := unittest.AssertExistsAndLoadBean(t, &actions_model.ActionRun{ID: 535681})
+		require.NoError(t, RefreshAndPropagateRunStatus(t.Context(), job.RunID))
 
-		require.NoError(t, RefreshAndPropagateRunStatus(t.Context(), run))
+		run := unittest.AssertExistsAndLoadBean(t, &actions_model.ActionRun{ID: job.RunID})
 
 		assert.Equal(t, actions_model.StatusSkipped, run.Status)
-		assert.Len(t, notifier.events, 1)
-		assert.Equal(t, notifier.events[0], actions_model.NewWorkflowRunCompleted(run, actions_model.StatusWaiting))
-		assert.NotNil(t, notifier.events[0].GetRun().Repo) // Notifier requires that all attributes have been loaded.
+
+		notifier.AssertNumberOfCalls(t, "WorkflowRunCompleted", 1)
+		notifier.AssertCalled(
+			t, "WorkflowRunCompleted", mock.Anything,
+			mock.MatchedBy(func(run *actions_model.ActionRun) bool {
+				return run.ID == job.RunID && run.Status == actions_model.StatusSkipped && run.Repo != nil
+			}),
+			actions_model.StatusWaiting,
+		)
+	})
+}
+
+func TestFailRunPreExecutionError(t *testing.T) {
+	require.NoError(t, unittest.PrepareTestDatabase())
+
+	timeutil.MockSet(time.Date(2026, 8, 25, 13, 36, 12, 0, time.UTC))
+	defer timeutil.MockUnset()
+
+	notifier := notify_service.NewMockNotifier(t)
+	notifier.On("Run").Return().Maybe()
+	notifier.On("WorkflowJobCompleted", mock.Anything, mock.Anything, mock.Anything).Return()
+	notifier.On("WorkflowRunCompleted", mock.Anything, mock.Anything, mock.Anything).Return()
+
+	notify_service.RegisterNotifier(notifier)
+	defer notify_service.UnregisterNotifier(notifier)
+
+	run := &actions_model.ActionRun{
+		ID:      541161,
+		Title:   "Test run",
+		OwnerID: 2,
+		RepoID:  62,
+		Status:  actions_model.StatusWaiting,
+	}
+	unittest.AssertSuccessfulInsert(t, run)
+
+	job := &actions_model.ActionRunJob{
+		ID:      880758,
+		RunID:   run.ID,
+		OwnerID: 2,
+		RepoID:  62,
+		Status:  actions_model.StatusWaiting,
+	}
+	unittest.AssertSuccessfulInsert(t, job)
+
+	require.NoError(t, FailRunPreExecutionError(t.Context(), run, actions_model.ErrorCodeJobParsingError, []any{123}))
+
+	run = unittest.AssertExistsAndLoadBean(t, &actions_model.ActionRun{ID: run.ID})
+
+	assert.Equal(t, actions_model.StatusFailure, run.Status)
+	assert.Equal(t, actions_model.ErrorCodeJobParsingError, run.PreExecutionErrorCode)
+	assert.Equal(t, []any{float64(123)}, run.PreExecutionErrorDetails)
+
+	job = unittest.AssertExistsAndLoadBean(t, &actions_model.ActionRunJob{ID: job.ID})
+
+	assert.Equal(t, actions_model.StatusFailure, job.Status)
+	assert.Equal(t, timeutil.TimeStamp(1787664972), job.Stopped)
+
+	notifier.AssertNumberOfCalls(t, "WorkflowJobCompleted", 1)
+	notifier.AssertNumberOfCalls(t, "WorkflowRunCompleted", 1)
+
+	notifier.AssertCalled(
+		t, "WorkflowJobCompleted", mock.Anything,
+		mock.MatchedBy(func(job *actions_model.ActionRunJob) bool {
+			return job.ID == 880758 && job.Status == actions_model.StatusFailure
+		}),
+		actions_model.StatusWaiting,
+	)
+	notifier.AssertCalled(
+		t, "WorkflowRunCompleted", mock.Anything,
+		mock.MatchedBy(func(run *actions_model.ActionRun) bool {
+			return run.ID == job.RunID && run.Status == actions_model.StatusFailure
+		}),
+		actions_model.StatusWaiting,
+	)
+}
+
+func TestInsertRun(t *testing.T) {
+	t.Run("Triggers notifications", func(t *testing.T) {
+		require.NoError(t, unittest.PrepareTestDatabase())
+
+		notifier := notify_service.NewMockNotifier(t)
+		notifier.On("Run").Return().Maybe()
+		notifier.On("NewWorkflowJobAttempt", mock.Anything, mock.Anything).Return()
+		notifier.On("NewWorkflowRunAttempt", mock.Anything, mock.Anything).Return()
+		notifier.On("WorkflowRunStatusChanged", mock.Anything, mock.Anything, mock.Anything).Return()
+
+		notify_service.RegisterNotifier(notifier)
+		defer notify_service.UnregisterNotifier(notifier)
+
+		user := unittest.AssertExistsAndLoadBean(t, &user_model.User{ID: 2})
+		repo := unittest.AssertExistsAndLoadBean(t, &repo_model.Repository{ID: 62, OwnerID: user.ID})
+
+		workflow := []byte(`
+on:
+  push:
+jobs:
+  build:
+    runs-on: debian
+    steps:
+      - run: echo OK
+`)
+
+		run := &actions_model.ActionRun{
+			ID:      541161,
+			Title:   "Test run",
+			OwnerID: user.ID,
+			RepoID:  repo.ID,
+			Status:  actions_model.StatusBlocked,
+		}
+
+		sw, err := jobparser.Parse(workflow, false)
+		require.NoError(t, err)
+
+		require.NoError(t, InsertRun(t.Context(), run, sw))
+
+		run = unittest.AssertExistsAndLoadBean(t, &actions_model.ActionRun{ID: run.ID})
+
+		assert.Equal(t, actions_model.StatusWaiting, run.Status)
+
+		notifier.AssertNumberOfCalls(t, "NewWorkflowJobAttempt", 1)
+		notifier.AssertNumberOfCalls(t, "NewWorkflowRunAttempt", 1)
+		notifier.AssertNumberOfCalls(t, "WorkflowRunStatusChanged", 1)
+		notifier.AssertCalled(
+			t, "NewWorkflowJobAttempt", mock.Anything,
+			mock.MatchedBy(func(job *actions_model.ActionRunJob) bool {
+				return job.RunID == 541161 && job.Status == actions_model.StatusWaiting && job.Run != nil
+			}),
+		)
+		notifier.AssertCalled(
+			t, "NewWorkflowRunAttempt", mock.Anything,
+			mock.MatchedBy(func(run *actions_model.ActionRun) bool {
+				return run.ID == 541161 && run.Status == actions_model.StatusBlocked
+			}),
+		)
+		notifier.AssertCalled(
+			t, "WorkflowRunStatusChanged", mock.Anything,
+			mock.MatchedBy(func(run *actions_model.ActionRun) bool {
+				return run.ID == 541161 && run.Status == actions_model.StatusWaiting
+			}),
+			actions_model.StatusBlocked,
+		)
 	})
 }
