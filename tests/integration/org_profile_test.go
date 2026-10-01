@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 	"testing"
 
 	org_model "forgejo.org/models/organization"
@@ -15,7 +14,6 @@ import (
 	user_model "forgejo.org/models/user"
 	"forgejo.org/modules/setting"
 	"forgejo.org/modules/test"
-	files_service "forgejo.org/services/repository/files"
 	"forgejo.org/tests"
 	"forgejo.org/tests/forgery"
 
@@ -32,26 +30,15 @@ func TestOrgProfile(t *testing.T) {
 				// Prepare the test repository
 				org3 := unittest.AssertExistsAndLoadBean(t, &user_model.User{ID: 3})
 
-				var ops []*files_service.ChangeRepoFile
-				op := "create"
-				if readmeFilename != "README.md" {
-					ops = append(ops, &files_service.ChangeRepoFile{
-						Operation: "delete",
-						TreePath:  "README.md",
-					})
-				} else {
-					op = "update"
-				}
+				files := forgery.MapFS{}
 				if readmeFilename != "" {
-					ops = append(ops, &files_service.ChangeRepoFile{
-						Operation:     op,
-						TreePath:      readmeFilename,
-						ContentReader: strings.NewReader("# Hi!\n"),
-					})
+					files[readmeFilename] = forgery.MapFile("# Hi!\n")
 				}
 
-				_, _, f := tests.CreateDeclarativeRepo(t, org3, ".profile", nil, nil, ops)
-				defer f()
+				forgery.CreateRepository(t, org3, &forgery.CreateRepositoryOptions{
+					Name:  ".profile",
+					Files: files,
+				})
 
 				// Perform the test
 				req := NewRequest(t, "GET", "/org3")
@@ -129,17 +116,15 @@ func TestOrgProfile(t *testing.T) {
 			// Prepare the test repository
 			org3 := unittest.AssertExistsAndLoadBean(t, &user_model.User{ID: 3})
 
-			_, _, f := tests.CreateDeclarativeRepo(t, org3, ".profile", nil, nil, []*files_service.ChangeRepoFile{
-				{
-					Operation: "update",
-					TreePath:  "README.md",
-					ContentReader: strings.NewReader(`## Lorem ipsum
+			forgery.CreateRepository(t, org3, &forgery.CreateRepositoryOptions{
+				Name: ".profile",
+				Files: forgery.MapFS{
+					"README.md": forgery.MapFile(`## Lorem ipsum
 dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
 ## Ut enim ad minim veniam
 quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum`),
 				},
 			})
-			defer f()
 
 			t.Run("full", func(t *testing.T) {
 				defer tests.PrintCurrentTest(t)()
@@ -169,12 +154,12 @@ quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequa
 
 			// Both guests and logged in users should see the feed option
 			doc := NewHTMLParser(t, MakeRequest(t, NewRequest(t, "GET", "/org3"), http.StatusOK).Body)
-			doc.AssertElement(t, ".org-header details.dropdown a[href='/org3.rss']", true)
-			doc.AssertElement(t, ".org-header details.dropdown a[href^='/report_abuse']", false)
+			doc.AssertElement(t, ".org-header .dialog-dropdown a[href='/org3.rss']", true)
+			doc.AssertElement(t, ".org-header .dialog-dropdown a[href^='/report_abuse']", false)
 
 			doc = NewHTMLParser(t, loginUser(t, "user10").MakeRequest(t, NewRequest(t, "GET", "/org3"), http.StatusOK).Body)
-			doc.AssertElement(t, ".org-header details.dropdown a[href='/org3.rss']", true)
-			doc.AssertElement(t, ".org-header details.dropdown a[href^='/report_abuse']", false)
+			doc.AssertElement(t, ".org-header .dialog-dropdown a[href='/org3.rss']", true)
+			doc.AssertElement(t, ".org-header .dialog-dropdown a[href^='/report_abuse']", false)
 		})
 
 		t.Run("More actions - none", func(t *testing.T) {
@@ -184,10 +169,10 @@ quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequa
 
 			// The dropdown won't appear if no entries are available, for both guests and logged in users
 			doc := NewHTMLParser(t, MakeRequest(t, NewRequest(t, "GET", "/org3"), http.StatusOK).Body)
-			doc.AssertElement(t, ".org-header details.dropdown", false)
+			doc.AssertElement(t, ".org-header .dialog-dropdown", false)
 
 			doc = NewHTMLParser(t, loginUser(t, "user10").MakeRequest(t, NewRequest(t, "GET", "/org3"), http.StatusOK).Body)
-			doc.AssertElement(t, ".org-header details.dropdown", false)
+			doc.AssertElement(t, ".org-header .dialog-dropdown", false)
 		})
 
 		t.Run("More actions - moderation", func(t *testing.T) {
@@ -197,18 +182,18 @@ quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequa
 
 			// The report option shouldn't be available to a guest
 			doc := NewHTMLParser(t, MakeRequest(t, NewRequest(t, "GET", "/org3"), http.StatusOK).Body)
-			doc.AssertElement(t, ".org-header details.dropdown", false)
+			doc.AssertElement(t, ".org-header .dialog-dropdown", false)
 
 			// But should be available to a logged in user
 			doc = NewHTMLParser(t, loginUser(t, "user10").MakeRequest(t, NewRequest(t, "GET", "/org3"), http.StatusOK).Body)
-			doc.AssertElement(t, ".org-header details.dropdown a[href^='/report_abuse']", true)
+			doc.AssertElement(t, ".org-header .dialog-dropdown a[href^='/report_abuse']", true)
 
 			// But the org owner shouldn't see the report option
 			doc = NewHTMLParser(t, loginUser(t, "user1").MakeRequest(t, NewRequest(t, "GET", "/org3"), http.StatusOK).Body)
-			doc.AssertElement(t, ".org-header details.dropdown", false)
+			doc.AssertElement(t, ".org-header .dialog-dropdown", false)
 		})
 
-		t.Run("Invitiation notification", func(t *testing.T) {
+		t.Run("Invitation notification", func(t *testing.T) {
 			defer tests.PrintCurrentTest(t)()
 
 			user2 := unittest.AssertExistsAndLoadBean(t, &user_model.User{ID: 2})

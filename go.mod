@@ -2,7 +2,7 @@ module forgejo.org
 
 go 1.26.0
 
-toolchain go1.26.8
+toolchain go1.27.1
 
 require (
 	code.forgejo.org/forgejo-contrib/go-libravatar v0.0.0-20260301104140-add494e31dab
@@ -105,6 +105,7 @@ require (
 	golang.org/x/oauth2 v0.37.0
 	golang.org/x/sync v0.23.0
 	golang.org/x/sys v0.48.0
+	golang.org/x/term v0.46.0
 	golang.org/x/text v0.42.0
 	golang.org/x/tools v0.50.0
 	google.golang.org/protobuf v1.36.12
