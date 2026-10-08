@@ -7,7 +7,7 @@ import {
   initRepoIssueAssignMe, reloadConfirmDraftComment,
 } from './repo-issue.js';
 import {initUnicodeEscapeButton} from './repo-unicode-escape.js';
-import {svg} from '../svg.js';
+import {svg} from '../svg.ts';
 import {htmlEscape} from 'escape-goat';
 import {initRepoBranchTagSelector} from './repo-branch-tag-selector.js';
 import {
@@ -27,7 +27,7 @@ import {getComboMarkdownEditor, initComboMarkdownEditor} from './comp/ComboMarkd
 import {attachRefIssueContextPopup} from './contextpopup.js';
 import {POST} from '../modules/fetch.js';
 import {MarkdownQuote} from '@github/quote-selection';
-import {toAbsoluteUrl} from '../utils.js';
+import {toAbsoluteUrl} from '../utils.ts';
 import {initDropzone, initDisabledInputs} from './common-global.js';
 
 export function initRepoCommentForm() {

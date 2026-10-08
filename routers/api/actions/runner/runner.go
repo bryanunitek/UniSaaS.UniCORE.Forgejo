@@ -14,7 +14,6 @@ import (
 	user_model "forgejo.org/models/user"
 	"forgejo.org/modules/actions"
 	"forgejo.org/modules/log"
-	"forgejo.org/modules/setting"
 	"forgejo.org/modules/sync"
 	"forgejo.org/modules/util"
 	actions_service "forgejo.org/services/actions"
@@ -324,16 +323,6 @@ func (*Service) UpdateTask(
 		if err := actions_service.EmitJobsIfReady(task.Job.RunID); err != nil {
 			log.Error("Emit ready jobs of run %d: %v", task.Job.RunID, err)
 		}
-		// Reaching a finalized result for a task can cause other tasks in the same concurrency group to become
-		// unblocked. Increasing task version here allows all applicable runners to requery to the DB for that state.
-		// Because it is only useful for that condition, and it has system performance risks, only enable it when
-		// concurrency group queuing is enabled.
-		if setting.Actions.ConcurrencyGroupQueueEnabled {
-			if err := actions_model.IncreaseTaskVersion(ctx, runner.OwnerID, runner.RepoID); err != nil {
-				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("fail to increase task version: %w", err))
-			}
-		}
-
 		if runner.Ephemeral {
 			err := actions_model.DeleteRunner(ctx, runner)
 			if err != nil {
@@ -367,40 +356,44 @@ func (*Service) UpdateLog(
 	} else if runner.ID != task.RunnerID {
 		return nil, connect.NewError(connect.CodeInternal, errors.New("invalid runner for task"))
 	}
+
 	ack := task.LogLength
+	emptyRows := len(req.Msg.Rows) == 0 || req.Msg.Index > ack || int64(len(req.Msg.Rows))+req.Msg.Index <= ack
+	updateTaskColumns := []string{} // columns for UpdateTask(...)
 
-	if len(req.Msg.Rows) == 0 || req.Msg.Index > ack || int64(len(req.Msg.Rows))+req.Msg.Index <= ack {
+	if !emptyRows {
+		if task.LogInStorage {
+			return nil, connect.NewError(connect.CodeAlreadyExists, errors.New("log file has been archived"))
+		}
+
+		rows := req.Msg.Rows[ack-req.Msg.Index:]
+		ns, err := actions.WriteLogs(ctx, task.LogFilename, task.LogSize, rows)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("write logs: %w", err))
+		}
+		task.LogLength += int64(len(rows))
+		for _, n := range ns {
+			task.LogIndexes = append(task.LogIndexes, task.LogSize)
+			task.LogSize += int64(n)
+		}
+
+		res.Msg.AckIndex = task.LogLength
+		updateTaskColumns = append(updateTaskColumns, "log_indexes", "log_length", "log_size")
+	} else {
 		res.Msg.AckIndex = ack
-		return res, nil
 	}
-
-	if task.LogInStorage {
-		return nil, connect.NewError(connect.CodeAlreadyExists, errors.New("log file has been archived"))
-	}
-
-	rows := req.Msg.Rows[ack-req.Msg.Index:]
-	ns, err := actions.WriteLogs(ctx, task.LogFilename, task.LogSize, rows)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("write logs: %w", err))
-	}
-	task.LogLength += int64(len(rows))
-	for _, n := range ns {
-		task.LogIndexes = append(task.LogIndexes, task.LogSize)
-		task.LogSize += int64(n)
-	}
-
-	res.Msg.AckIndex = task.LogLength
 
 	var remove func()
 	if req.Msg.NoMore {
 		task.LogInStorage = true
+		updateTaskColumns = append(updateTaskColumns, "log_in_storage")
 		remove, err = actions.TransferLogs(ctx, task.LogFilename)
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("transfer logs: %w", err))
 		}
 	}
 
-	if err := actions_model.UpdateTask(ctx, task, "log_indexes", "log_length", "log_size", "log_in_storage"); err != nil {
+	if err := actions_model.UpdateTask(ctx, task, updateTaskColumns...); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("update task: %w", err))
 	}
 	if remove != nil {
