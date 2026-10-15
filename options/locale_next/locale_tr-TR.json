@@ -1,4 +1,8 @@
 {
+	"mde.buttons.switch_to_legacy.tooltip": "Eski düzenleyiciyi kullan",
+	"mde.buttons.new_table.tooltip": "Tablo ekle",
+	"mde.buttons.unindent.tooltip": "Bir seviye girinti azalt",
+	"mde.buttons.indent.tooltip": "Bir seviye girinti artır",
 	"sync_fork.sync.button": "Senkronize et",
 	"sync_fork.branch_behind": {
 		"one": "Bu dal, %[2]s dalından %[1]d katkı geride",
@@ -116,10 +120,6 @@
 	"user.visibility.limited.title": "Sınırlı",
 	"user.visibility.public.tooltip": "Herkes tarafından görünür",
 	"user.visibility.public.title": "Herkese Açık",
-	"mde.buttons.new_table.tooltip": "Eski düzenleyiciyi kullan",
-	"mde.buttons.unindent.tooltip": "Tablo ekle",
-	"mde.buttons.indent.tooltip": "Bir seviye girinti azalt",
-	"mde.buttons.switch_to_legacy.tooltip": "Bir seviye girinti artır",
 	"mde.buttons.ref.tooltip": "Bir konuya veya değişiklik isteğine değin",
 	"mde.buttons.mention.tooltip": "Bir kişiye veya takıma değin",
 	"mde.buttons.list.task.tooltip": "Görev listesi ekle",
@@ -219,7 +219,6 @@
 	"admin.dashboard.cleanup_hook_task_table": "Hook_task tablosunu temizleme",
 	"admin.dashboard.sync_external_users": "Harici kullanıcı verisini senkronize et",
 	"admin.dashboard.reinit_missing_repos": "Kayıtları bulunanlar için tüm eksik Git depolarını yeniden başlat",
-	"admin.dashboard.resync_all_hooks": "Tüm depoların Git kancalarını yeniden eşitle/senkronize et (pre-receive, update, post-receive, proc-receive, …)",
 	"admin.dashboard.resync_all_sshprincipals": "'.ssh/authorized_principals' dosyasını Forgejo SSH sorumlularıyla güncelleyin.",
 	"admin.dashboard.resync_all_sshkeys": "'.ssh/authority_keys' dosyasını Forgejo SSH anahtarlarıyla güncelle.",
 	"admin.dashboard.git_gc_repos": "Depolardaki çöpleri topla",

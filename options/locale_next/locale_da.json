@@ -1,4 +1,8 @@
 {
+	"mde.buttons.switch_to_legacy.tooltip": "Brug den gamle editor i stedet",
+	"mde.buttons.new_table.tooltip": "Tilføj tabel",
+	"mde.buttons.unindent.tooltip": "Udsortere genstande med ét niveau",
+	"mde.buttons.indent.tooltip": "Indlejring af genstande med ét niveau",
 	"sync_fork.sync.button": "Sync",
 	"sync_fork.branch_behind": {
 		"one": "Denne gren er %[1]d commit bag %[2]s",
@@ -118,10 +122,6 @@
 	"user.visibility.limited.title": "Begrænset",
 	"user.visibility.public.tooltip": "Synlig for alle",
 	"user.visibility.public.title": "Offentlig",
-	"mde.buttons.new_table.tooltip": "Brug den gamle editor i stedet",
-	"mde.buttons.unindent.tooltip": "Tilføj tabel",
-	"mde.buttons.indent.tooltip": "Udsortere genstande med ét niveau",
-	"mde.buttons.switch_to_legacy.tooltip": "Indlejring af genstande med ét niveau",
 	"mde.buttons.ref.tooltip": "Henvis til et problem eller pull-anmodning",
 	"mde.buttons.mention.tooltip": "Nævn en bruger eller et team",
 	"mde.buttons.list.task.tooltip": "Tilføj en liste over opgaver",
@@ -221,7 +221,6 @@
 	"admin.dashboard.cleanup_hook_task_table": "Oprydning hook_task tabel",
 	"admin.dashboard.sync_external_users": "Synkroniser eksterne brugerdata",
 	"admin.dashboard.reinit_missing_repos": "Geninitialiser alle manglende Git-depoter, som der findes poster for",
-	"admin.dashboard.resync_all_hooks": "Gensynkroniser Git hooks for alle depoter (pre-receive, update, post-receive, proc-receive,...)",
 	"admin.dashboard.resync_all_sshprincipals": "Opdater \".ssh/authorized_principals\" filen med Forgejo SSH principals.",
 	"admin.dashboard.resync_all_sshkeys": "Opdater filen \".ssh/authorized_keys\" med Forgejo SSH-nøgler.",
 	"admin.dashboard.git_gc_repos": "Samle alt affald fra alle depoter",

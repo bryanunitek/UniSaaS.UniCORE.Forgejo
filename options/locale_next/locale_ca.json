@@ -1,4 +1,8 @@
 {
+	"mde.buttons.switch_to_legacy.tooltip": "En el seu lloc, utilitzar l'editor de codi antic",
+	"mde.buttons.new_table.tooltip": "Afegir taula",
+	"mde.buttons.unindent.tooltip": "Desaniuna els elements un nivell",
+	"mde.buttons.indent.tooltip": "Aniua els elements un nivell",
 	"sync_fork.sync.button": "Sincronitza",
 	"sync_fork.branch_behind": {
 		"one": "Aquesta branca és %[1]d commit darrere de %[2]s",
@@ -121,10 +125,6 @@
 	"user.visibility.limited.title": "Limitat",
 	"user.visibility.public.tooltip": "Visible per a tothom",
 	"user.visibility.public.title": "Públic",
-	"mde.buttons.new_table.tooltip": "En el seu lloc, utilitzar l'editor de codi antic",
-	"mde.buttons.unindent.tooltip": "Afegir taula",
-	"mde.buttons.indent.tooltip": "Desaniuna els elements un nivell",
-	"mde.buttons.switch_to_legacy.tooltip": "Aniua els elements un nivell",
 	"mde.buttons.ref.tooltip": "Referenciar un problema o una \"pull request\"",
 	"mde.buttons.mention.tooltip": "Mencionar un usuari o equip",
 	"mde.buttons.list.task.tooltip": "Afegir una llista de tasques",
@@ -212,7 +212,6 @@
 	"admin.dashboard.cleanup_hook_task_table": "Netejar la taula hook_task",
 	"admin.dashboard.sync_external_users": "Sincronitzar dades d'usuari externes",
 	"admin.dashboard.reinit_missing_repos": "Reinicialitza tots els repositoris Git que falten i que tenen registres",
-	"admin.dashboard.resync_all_hooks": "Resincronitzar els ganxos Git de tots els repositoris (pre-receive, update, post-receive, proc-receive, …)",
 	"admin.dashboard.resync_all_sshprincipals": "Actualitzar el fitxer \".ssh/authorized_principals\" amb els principals SSH de Forgejo.",
 	"admin.dashboard.resync_all_sshkeys": "Actualitzar el fitxer \".ssh/authorized_keys\" amb les claus SSH de Forgejo.",
 	"admin.dashboard.git_gc_repos": "Recull la brossa de tots els repositoris",

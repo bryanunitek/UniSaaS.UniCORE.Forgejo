@@ -1,4 +1,8 @@
 {
+	"mde.buttons.switch_to_legacy.tooltip": "Utiliser l’ancien éditeur à la place",
+	"mde.buttons.new_table.tooltip": "Ajouter une table",
+	"mde.buttons.unindent.tooltip": "Supprimer un niveau d'indentation",
+	"mde.buttons.indent.tooltip": "Indenter les éléments d'un niveau",
 	"sync_fork.sync.button": "Sync",
 	"sync_fork.branch_behind": {
 		"one": "Cette branche a %[1]d commits de retard sur %[2]s",
@@ -121,10 +125,6 @@
 	"user.visibility.limited.title": "Limité",
 	"user.visibility.public.tooltip": "Visible par tout le monde",
 	"user.visibility.public.title": "Public",
-	"mde.buttons.new_table.tooltip": "Utiliser l’ancien éditeur à la place",
-	"mde.buttons.unindent.tooltip": "Ajouter une table",
-	"mde.buttons.indent.tooltip": "Supprimer un niveau d'indentation",
-	"mde.buttons.switch_to_legacy.tooltip": "Indenter les éléments d'un niveau",
 	"mde.buttons.ref.tooltip": "Référencer un ticket ou demande d’ajout",
 	"mde.buttons.mention.tooltip": "Mentionner un utilisateur ou une équipe",
 	"mde.buttons.list.task.tooltip": "Ajouter une liste de tâches",
@@ -224,7 +224,6 @@
 	"admin.dashboard.cleanup_hook_task_table": "Nettoyer la table hook_task",
 	"admin.dashboard.sync_external_users": "Synchroniser les données de l’utilisateur externe",
 	"admin.dashboard.reinit_missing_repos": "Réinitialiser tous les dépôts Git manquants pour lesquels un enregistrement existe",
-	"admin.dashboard.resync_all_hooks": "Re-synchroniser les déclencheurs Git de tous les dépôts (pre-receive, update, post-receive, proc-receive, ...)",
 	"admin.dashboard.resync_all_sshprincipals": "Mettre à jour le fichier « .ssh/authorized_principals » avec les principaux de Forgejo SSH.",
 	"admin.dashboard.resync_all_sshkeys": "Mettre à jour le fichier « ssh/authorized_keys » avec les clés SSH Forgejo.",
 	"admin.dashboard.git_gc_repos": "Exécuter le ramasse-miette des dépôts",

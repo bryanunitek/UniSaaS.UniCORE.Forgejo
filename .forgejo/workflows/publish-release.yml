@@ -30,7 +30,7 @@
 #  secrets.GPG_PRIVATE_KEY: <XYZ>
 #  secrets.GPG_PASSPHRASE: <ABC>
 #
-name: Pubish release
+name: Publish release
 
 on:
   push:

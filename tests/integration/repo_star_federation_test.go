@@ -79,3 +79,21 @@ func TestActivityPubRepoFollowing(t *testing.T) {
 		}
 	})
 }
+
+func TestRepoActivityNotFollowing(t *testing.T) {
+	defer tests.PrepareTestEnv(t)()
+	defer test.MockVariableValue(&setting.Federation.Enabled, true)()
+
+	user := unittest.AssertExistsAndLoadBean(t, &user_model.User{ID: 2})
+	repo := unittest.AssertExistsAndLoadBean(t, &repo_model.Repository{ID: 1, OwnerID: user.ID})
+	session := loginUser(t, user.Name)
+
+	t.Run("Star a repo without a following repo", func(t *testing.T) {
+		defer tests.PrintCurrentTest(t)()
+		repoLink := fmt.Sprintf("/%s", repo.FullName())
+		link := fmt.Sprintf("%s/action/star", repoLink)
+		req := NewRequest(t, "POST", link)
+
+		session.MakeRequest(t, req, http.StatusOK)
+	})
+}

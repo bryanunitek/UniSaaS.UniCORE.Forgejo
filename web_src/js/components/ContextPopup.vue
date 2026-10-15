@@ -1,7 +1,7 @@
 <script>
 import {SvgIcon} from '../svg.ts';
-import {contrastColor} from '../utils/color.js';
-import {GET} from '../modules/fetch.js';
+import {contrastColor} from '../utils/color.ts';
+import {GET} from '../modules/fetch.ts';
 import {emojiHTML} from '../features/emoji.ts';
 import {htmlEscape} from 'escape-goat';
 

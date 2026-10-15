@@ -112,6 +112,10 @@ func SendLikeActivities(ctx context.Context, doer user.User, repoID int64) error
 		return err
 	}
 
+	if len(followingRepos) == 0 {
+		return nil
+	}
+
 	likeActivityList := make([]fm.ForgeLike, 0)
 	var hosts []*url.URL
 	for _, followingRepo := range followingRepos {

@@ -1,4 +1,8 @@
 {
+	"mde.buttons.switch_to_legacy.tooltip": "Passa all'editor classico",
+	"mde.buttons.new_table.tooltip": "Aggiungi tabella",
+	"mde.buttons.unindent.tooltip": "Disannida elementi di un livello",
+	"mde.buttons.indent.tooltip": "Annida elementi di un livello",
 	"sync_fork.sync.button": "Sincronizza",
 	"sync_fork.branch_behind": {
 		"one": "Questo ramo è indietro di %[1]d commit rispetto a %[2]s",
@@ -121,10 +125,6 @@
 	"user.visibility.limited.title": "Limitato",
 	"user.visibility.public.tooltip": "Visibile a tutti",
 	"user.visibility.public.title": "Pubblico",
-	"mde.buttons.new_table.tooltip": "Passa all'editor classico",
-	"mde.buttons.unindent.tooltip": "Aggiungi tabella",
-	"mde.buttons.indent.tooltip": "Disannida elementi di un livello",
-	"mde.buttons.switch_to_legacy.tooltip": "Annida elementi di un livello",
 	"mde.buttons.ref.tooltip": "Fa riferimento a una segnalazione o richiesta di modifica",
 	"mde.buttons.mention.tooltip": "Menziona un utente o team",
 	"mde.buttons.list.task.tooltip": "Aggiungi un elenco di attività",
@@ -224,7 +224,6 @@
 	"admin.dashboard.cleanup_hook_task_table": "Pulisci tabella hook_task",
 	"admin.dashboard.sync_external_users": "Sincronizza dati utente esterno",
 	"admin.dashboard.reinit_missing_repos": "Reinizializza tutti i repository Git mancanti per i quali esistono cambiamenti registrati esistenti",
-	"admin.dashboard.resync_all_hooks": "Sincronizza nuovamente gli hook di pre-ricezione, di aggiornamento e di post-ricezione di tutti i progetti",
 	"admin.dashboard.resync_all_sshprincipals": "Aggiorna il file \".ssh/authorized_keys\" con le chiavi principali SSH Forgejo.",
 	"admin.dashboard.resync_all_sshkeys": "Aggiornare il file \".ssh/authorized_keys\" con le chiavi SSH di Forgejo.",
 	"admin.dashboard.git_gc_repos": "Esegui la garbage collection su tutti i repository",

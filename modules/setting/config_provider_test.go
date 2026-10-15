@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"forgejo.org/modules/duration"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -114,6 +116,48 @@ func TestNewConfigProviderFromFile(t *testing.T) {
 	assert.Equal(t, "[foo]\nk1 = a\n\n[bar]\nk1 = b\n", string(bs))
 }
 
+// basically a copy of TestNewConfigProviderFromFile without the file
+func TestNewVolatileConfigProvider(t *testing.T) {
+	cfg, err := NewVolatileConfigProvider(NewConfigProviderFromData(""))
+	require.NoError(t, err)
+
+	sec, _ := cfg.NewSection("foo")
+	_, _ = sec.NewKey("k1", "a")
+	s, err := cfg.String()
+	require.NoError(t, err)
+	assert.Equal(t, "[foo]\nk1 = a\n", s)
+
+	_, _ = sec.NewKey("k2", "b")
+	s, err = cfg.String()
+	require.NoError(t, err)
+	assert.Equal(t, "[foo]\nk1 = a\nk2 = b\n", s)
+
+	// parse string again as new config and modify
+	cfg, err = NewVolatileConfigProvider(NewConfigProviderFromData(s))
+	require.NoError(t, err)
+
+	assert.Equal(t, "a", cfg.Section("foo").Key("k1").String())
+	sec, _ = cfg.NewSection("bar")
+	_, _ = sec.NewKey("k1", "b")
+	s, err = cfg.String()
+	require.NoError(t, err)
+	assert.Equal(t, "[foo]\nk1 = a\nk2 = b\n\n[bar]\nk1 = b\n", s)
+
+	// coverage: exercise the other wrappers
+	// 3: DEFAULT, foo, bar
+	assert.Len(t, cfg.Sections(), 3)
+	getSec, err := cfg.GetSection("bar")
+	require.NoError(t, err)
+	assert.Equal(t, sec, getSec)
+	require.NoError(t, cfg.Save())
+	require.NoError(t, cfg.SaveTo("bogus.ini"))
+	assert.Empty(t, cfg.GetFile())
+	cfg.DisableSaving()
+	tcfg, err := cfg.PrepareSaving()
+	require.NoError(t, err)
+	assert.Equal(t, cfg, tcfg)
+}
+
 func TestNewConfigProviderForLocale(t *testing.T) {
 	// load locale from file
 	localeFile := t.TempDir() + "/locale.ini"
@@ -184,7 +228,15 @@ func TestMustDuration(t *testing.T) {
 		sec := cfg.Section("test")
 		sec.NewKey("VALUE", value)
 
-		return sec.Key("VALUE").MustDuration(defaultValue)
+		d, err := sec.Key("VALUE").MustDuration(defaultValue)
+		// test that the persisted value is the same as the returned value or
+		// defaultValue, matching gopkg.in/ini.v1 behavior
+		if err == nil {
+			actual, err := duration.Parse(sec.Key("VALUE").String())
+			require.NoError(t, err)
+			assert.Equal(t, d, actual)
+		}
+		return d, err
 	}
 
 	val, err := test("", time.Hour)
