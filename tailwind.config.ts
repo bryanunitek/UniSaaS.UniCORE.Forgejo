@@ -30,7 +30,7 @@ export default {
   important: true, // the frameworks are mixed together, so tailwind needs to override other framework's styles
   content: [
     isProduction && '!./templates/demo/**/*',
-    isProduction && '!./web_src/js/standalone/demo.js',
+    isProduction && '!./web_src/js/standalone/demo.ts',
     '!./templates/swagger/v1_json.tmpl',
     '!./templates/user/auth/oidc_wellknown.tmpl',
     './templates/**/*.tmpl',
@@ -128,7 +128,7 @@ export default {
         // * jQuery's show/hide/toggle: it can not show/hide elements with "display: xxx !important"
         // only use:
         // * this ".tw-hidden" class
-        // * showElem/hideElem/toggleElem functions in "utils/dom.js"
+        // * showElem/hideElem/toggleElem functions in "utils/dom.ts"
         '.hidden.hidden': {
           'display': 'none',
         },

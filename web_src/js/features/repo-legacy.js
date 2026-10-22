@@ -16,13 +16,13 @@ import {
 import {initCompLabelEdit} from './comp/LabelEdit.js';
 import {initRepoDiffConversationNav} from './repo-diff.js';
 import {syncSuggestionBatchUI} from './repo-suggestion.js';
-import {showErrorToast} from '../modules/toast.js';
+import {showErrorToast} from '../modules/toast.ts';
 import {initCommentContent, initMarkupContent} from '../markup/content.js';
 import {initCompReactionSelector} from './comp/ReactionSelector.js';
 import {initRepoSettingBranches} from './repo-settings.js';
 import {initRepoPullRequestMergeForm} from './repo-issue-pr-form.js';
 import {initRepoPullRequestCommitStatus} from './repo-issue-pr-status.js';
-import {hideElem, showElem} from '../utils/dom.js';
+import {hideElem, showElem} from '../utils/dom.ts';
 import {getComboMarkdownEditor, initComboMarkdownEditor} from './comp/ComboMarkdownEditor.js';
 import {attachRefIssueContextPopup} from './contextpopup.js';
 import {POST} from '../modules/fetch.ts';
