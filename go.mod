@@ -26,6 +26,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.13.0
 	github.com/SaveTheRbtz/zstd-seekable-format-go/pkg v0.9.0
 	github.com/alecthomas/chroma/v2 v2.27.0
+	github.com/alecthomas/participle/v2 v2.1.4
 	github.com/blakesmith/ar v0.0.0-20190502131153-809d4375e1fb
 	github.com/blevesearch/bleve/v2 v2.6.1
 	github.com/buildkite/terminal-to-html/v3 v3.17.1
@@ -110,7 +111,7 @@ require (
 	golang.org/x/tools v0.51.0
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
-	gopkg.in/ini.v1 v1.67.3
+	gopkg.in/ini.v1 v1.68.0
 	mvdan.cc/xurls/v2 v2.6.0
 	pault.ag/go/debian v0.21.4
 	xorm.io/builder v0.3.13
